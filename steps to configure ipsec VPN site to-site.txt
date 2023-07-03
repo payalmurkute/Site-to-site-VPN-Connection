@@ -1,0 +1,95 @@
+steps to configure ipsec VPN site to site configuration.txt
+
+ create vpc in two different region
+1  create vpc in (mumbai region) ...CIDR (10.100.0.0/16)
+  	Tenancy --default--create vpc
+2  create subnet -- select vpc ID --create subnet
+3  create route table > name > select vpc -- tag optional-- create route table
+4  create IGW > name tag -- create > select IGW > action > Attach vpc
+
+create EC2 instance in same region
+
+1 launch instance -- name --select os image > istance type > bcoz of acces select                key pair (keypair-01) 
+    Edit-Network setting >select vpc -- subnet -- public ip (disable)-- launch    instance
+
+create vpc in different region 
+
+1  create vpc in (virginia region) ...CIDR (10/200.0.0/16)
+     Tenancy --default--create vpc
+2   create subnet
+3   create IGW >> attach vpc 
+4   create route table -- then --edit route > 0.0.0.0/0 (internet gateway)--save     
+      change >> select subnet association -- edit -- select my subnet--save 
+
+create EC2 instance in same virginia region
+
+1  launch instance -- name --select os image > istance type > bcoz of acces select                
+    key pair 
+    Edit-Network setting >select vpc -- subnet -- public ip (enable)-- launch    instance
+
+  In both instances edit inbound rules 
+ (in mumbai region) 
+ security group > edit inbound rule > type -- ALL TCP --source (custom)
+  10.100.0.0/16
+   open -- ALL ICMP-- source (anywere) -- 10.100.0.0/16
+
+  (in virginia region)
+   security group > edit inbound rule > type -- ALL TCP --source (custom)
+  10.200.0.0/16
+   open -- ALL ICMP-- source (anywere) -- 10.200.0.0/16
+
+create VPN (mumbai region)
+
+1  create customer gateway -- name -- ip address(public ip in server side)
+2  create VPG 
+3  create site-to-site vpn -> name -- Target gateway type (virtual private gateway) > CG -- (existing) 
+    Routing option -- static (add server side subnet id)--10.200.0.0/16
+4 select vpn --download conf file -- check point--openswan
+
+gives ssh in (public ip)
+
+#sudo yum install openswan -y
+#sudo vim /etc/sysctl.conf -- open to check commented or uncomment
+   net.ipv4.ip_forward = 1
+   net.ipv4.conf.default.rp_filter = 0
+   net.ipv4.conf.default.accept_source_route = 0
+#executing the command 'sysctl -p'
+ Restart Network service 
+#sudo service network restart 
+#sudo vim /etc/ipsec.conf
+  then save and exit the file
+  #include /etc/ipsec.d/*.conf (remove # bcoz of uncommented)
+create new file
+#sudo vim /etc/ipsec.d/aws.conf
+  paste tunnel 1
+conn Tunnel1
+	authby=secret
+	auto=start
+	left=%defaultroute
+	leftid=184.72.76.58
+	right=13.233.191.111
+	type=tunnel
+	ikelifetime=8h
+	keylife=1h
+	phase2alg=aes128-sha1;modp1024
+	ike=aes128-sha1;modp1024
+	auth=esp
+	keyingtries=%forever
+	keyexchange=ike
+	leftsubnet=10.200.0.0/16
+	rightsubnet=10.100.0.0/16
+	dpddelay=10
+	dpdtimeout=30
+	dpdaction=restart_by_peer
+
+     :- remove (auto=esp)
+#chconfig ipsec on 
+#systemctl restart ipsec
+#systemctl status ipsec
+
+--go to route table of vpc >main office >> route propagation > check > save
+--check VPN connection status is avilable and tunnel is up  
+conneect instance in vpc on private ip
+ ssh ping (private ip)
+finally connected
+
